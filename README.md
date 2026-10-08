@@ -20,6 +20,16 @@ lightgbm
 catboost
 torch
 ```
+## Данные
+
+```
+Датасет нужно скачать отдельно с Kaggle - не пушил CSV:
+[Titanic — Machine Learning from Disaster](https://www.kaggle.com/c/titanic)
+
+Положи файлы в папку `data/` под именами:
+- `data/train_titanic.csv`
+- `data/test_titanic.csv`
+```
 
 ## Запуск
 
