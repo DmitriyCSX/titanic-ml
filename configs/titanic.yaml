@@ -1,0 +1,49 @@
+project: titanic
+task: classification
+target: Survived
+id_column: PassengerId
+
+data:
+  train_path: data/train_titanic.csv
+  test_path: data/test_titanic.csv
+  submission_path: submissions/submission_titanic.csv
+
+features:
+  drop_columns: [PassengerId, Name, Ticket, Cabin]
+  fillna:
+    Age: median
+    Fare: median
+    Embarked: mode
+  ordinal:
+    AgeGroup: {Kid: 0, Teen: 1, Adult: 2, Old: 3}
+  onehot: [Sex, Embarked, Title]
+  scale_columns: [Age, Fare, FarePerPerson]
+
+model:
+  name: dnn
+  dnn:
+    hidden_sizes: [64, 32]
+    epochs: 300
+    batch_size: 32
+    lr: 0.001
+    patience: 20
+    dropout: 0.2
+
+training:
+  cv_folds: 5
+  cv_strategy: stratified
+  scoring: accuracy
+  test_size: 0.2
+  random_state: 42
+
+tuning:
+  enabled: false
+  n_trials: 50
+  direction: maximize
+  search_space:
+    n_estimators: {type: int, low: 3, high: 300}
+    learning_rate: {type: float, low: 0.01, high: 0.5, log: true}
+    max_depth: {type: int, low: 2, high: 8}
+    num_leaves: {type: int, low: 4, high: 64}
+    reg_alpha: {type: float, low: 1e-8, high: 10.0, log: true}
+    reg_lambda: {type: float, low: 1e-8, high: 10.0, log: true}
