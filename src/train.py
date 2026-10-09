@@ -14,7 +14,7 @@ from sklearn.model_selection import (
 from src.models import build_model, train_dnn
 from src.utils import get_scorer, log, rmse
 
-
+# выбирает CV-сплиттер по task: StratifiedKFold для classification, KFold для regression
 def _cv_splitter(config: dict[str, Any]):
     folds = config["training"]["cv_folds"]
     seed = config["training"]["random_state"]
@@ -22,7 +22,7 @@ def _cv_splitter(config: dict[str, Any]):
         return StratifiedKFold(n_splits=folds, shuffle=True, random_state=seed)
     return KFold(n_splits=folds, shuffle=True, random_state=seed)
 
-
+# 5-fold CV (или n из конфига), возвращает (mean, std) метрики
 def cross_validate(model, X, y, config) -> tuple[float, float]:
     scorer = get_scorer(config["task"])
     scores = cross_val_score(model, X, y, cv=_cv_splitter(config), scoring=scorer)
@@ -30,7 +30,7 @@ def cross_validate(model, X, y, config) -> tuple[float, float]:
         scores = -scores   # sklearn инвертирует RMSE - возвращаем на место (а то там отрицателный скор получается почему-то)
     return float(scores.mean()), float(scores.std())
 
-
+# CV + fit sklearn-совместимой модели, лог holdout-метрики, возвращает (model, info)
 def train_classic(X_train, y_train, X_val, y_val, config) -> tuple[Any, dict]:
     """Обучает классическую модель (LGBM/CatBoost/...)."""
     model_cfg = config["model"]
@@ -50,7 +50,7 @@ def train_classic(X_train, y_train, X_val, y_val, config) -> tuple[Any, dict]:
 
     return model, {"cv_mean": cv_mean, "cv_std": cv_std}
 
-
+# обучает MLP через train_dnn с параметрам
 def train_dnn_model(X_train, y_train, X_val, y_val, config) -> tuple[Any, dict]:
     """Обучает DNN с early stopping."""
     dnn_cfg = config["model"].get("dnn", {})

@@ -12,18 +12,20 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 # Feature engineering (чистые функции, возвращают новый df)
 # ============================================================
 
+
+# извлекает титул (Mr, Mrs, Miss, ...) из колонки Name через regex
 def titanic_extract_title(df: pd.DataFrame) -> pd.Series:
     return df["Name"].str.extract(r" ([A-Za-z]+)\.", expand=False)
 
-
+# размер семьи: SibSp + Parch + 1 (сам пассажир)
 def titanic_family_size(df: pd.DataFrame) -> pd.Series:
     return df["SibSp"] + df["Parch"] + 1
 
-
+# бинарный флаг: 1 если пассажир без семьи (SibSp=0 и Parch=0)
 def titanic_is_alone(df: pd.DataFrame) -> pd.Series:
     return (df["SibSp"] + df["Parch"] == 0).astype(int)
 
-
+# категориальная группа возраста (Kid / Teen / Adult / Old) через pd.cut
 def titanic_age_group(df: pd.DataFrame) -> pd.Series:
     return pd.cut(
         df["Age"],
@@ -31,16 +33,16 @@ def titanic_age_group(df: pd.DataFrame) -> pd.Series:
         labels=["Kid", "Teen", "Adult", "Old"],
     )
 
-
+# Fare / FamilySize (цена билета на человека)
 def titanic_fare_per_person(df: pd.DataFrame) -> pd.Series:
     fam = titanic_family_size(df).replace(0, 1)
     return df["Fare"] / fam
 
-
+# бинарный флаг: 1 если Cabin заполнен (пассажир знал номер каюты)
 def titanic_has_cabin(df: pd.DataFrame) -> pd.Series:
     return df["Cabin"].notna().astype(int)
 
-
+# полный FE-пайплайн: Title, FamilySize, IsAlone, AgeGroup, FarePerPerson, HasCabin; редкие Title → "Rare"
 def build_titanic_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["Title"] = titanic_extract_title(df)
@@ -56,6 +58,7 @@ def build_titanic_features(df: pd.DataFrame) -> pd.DataFrame:
 
 # ============================================================
 # Препроцессинг-пайплайн (fit на train, transform на val/test)
+# обучает препроцессор на train: drop, fillna, медианы, OHE, scaler; запоминает feature_columns_
 # ============================================================
 
 class TabularPreprocessor:
@@ -105,6 +108,7 @@ class TabularPreprocessor:
         self.is_fitted = True
         return self
 
+    # применяет обученные преобразования к val/test (без пересчёта статистик)
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         assert self.is_fitted, "Сначала fit()"
         df = df.copy()
@@ -122,14 +126,17 @@ class TabularPreprocessor:
         df = df[self.feature_columns_]
         return df
 
+    # fit + transform за один вызов
     def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
         return self.fit(df).transform(df)
 
+    # обратное преобразование таргета (expm1 если log_target=True)
     def inverse_target(self, y):
         if self.cfg.get("log_target"):
             return np.expm1(y)
         return y
 
+    # прямое преобразование таргета (log1p если log_target=True)
     def transform_target(self, y):
         if self.cfg.get("log_target"):
             return np.log1p(y)
@@ -137,9 +144,12 @@ class TabularPreprocessor:
 
     # ---------- внутренние шаги ----------
 
+    
+    # лог-трансформация применяется отдельно в train/predict
     def _log_target_fit(self, df):
         pass
 
+    # удаляет колонки из config.features.drop_columns
     def _drop_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         drop = self.cfg.get("drop_columns") or []
         existing = [c for c in drop if c in df.columns]
@@ -147,6 +157,7 @@ class TabularPreprocessor:
             df = df.drop(columns=existing)
         return df
 
+    # "нет фичи" → "None" для категориальных, 0 для числовых
     def _fill_none(self, df: pd.DataFrame) -> pd.DataFrame:
         for col in self.cfg.get("none_categorical", []):
             if col in df.columns:
@@ -156,6 +167,7 @@ class TabularPreprocessor:
                 df[col] = df[col].fillna(0)
         return df
 
+    # считает медианы по группам (fit на train) и заполняет ими пропуски
     def _fit_group_medians(self, df: pd.DataFrame) -> pd.DataFrame:
         self.group_medians_ = {}
         for col, group in self.cfg.get("group_median", {}).items():
@@ -165,6 +177,7 @@ class TabularPreprocessor:
                 df[col] = df[col].fillna(df[group].map(med))
         return df
 
+    # применяет сохранённые медианы к val/test
     def _apply_group_medians(self, df: pd.DataFrame) -> pd.DataFrame:
         for col, med in getattr(self, "group_medians_", {}).items():
             group = self.cfg["group_median"][col]
@@ -172,6 +185,7 @@ class TabularPreprocessor:
                 df[col] = df[col].fillna(df[group].map(med))
         return df
 
+    # заполняет пропуски медианой/модой (fit на train) или применяет сохранённые значения
     def _impute(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:
         fillna_cfg = self.cfg.get("fillna", {})
         if fit:
@@ -189,6 +203,7 @@ class TabularPreprocessor:
             df[col] = df[col].fillna(self.impute_stats_[col])
         return df
 
+    # ordinal-кодирование по маппингу из конфига (с поддержкой формата {categories: [...]})
     def _encode_ordinal(self, df: pd.DataFrame, fit: bool) -> pd.DataFrame:
         ordinal_cfg = self.cfg.get("ordinal", {})
         if fit:
@@ -204,6 +219,7 @@ class TabularPreprocessor:
             df[col] = df[col].map(self.ordinal_maps_[col]).fillna(0).astype(int)
         return df
 
+    # обучает OneHotEncoder на train (handle_unknown="ignore", drop="first")
     def _fit_onehot(self, df: pd.DataFrame) -> pd.DataFrame:
         onehot_cfg = self.cfg.get("onehot", [])
         if onehot_cfg == "auto":
@@ -219,6 +235,7 @@ class TabularPreprocessor:
             self.onehot_encoder_.fit(df[onehot_cols])
         return df
 
+    # применяет OHE к val/test, дропает исходные категориальные колонки
     def _apply_onehot(self, df: pd.DataFrame) -> pd.DataFrame:
         if not getattr(self, "onehot_cols_", None):
             return df
@@ -231,6 +248,7 @@ class TabularPreprocessor:
         df = df.drop(columns=self.onehot_cols_)
         return pd.concat([df, encoded_df], axis=1)
 
+    # обучает StandardScaler на scale_columns из конфига (или отключает, если null)
     def _fit_scaler(self, df: pd.DataFrame) -> pd.DataFrame:
         scale_cols = self.cfg.get("scale_columns")
         if not scale_cols:
@@ -242,6 +260,7 @@ class TabularPreprocessor:
             self.scaler_.fit(df[self.scale_cols_])
         return df
 
+    # применяет scaler к val/test
     def _apply_scaler(self, df: pd.DataFrame) -> pd.DataFrame:
         if getattr(self, "scaler_", None) is None:
             return df

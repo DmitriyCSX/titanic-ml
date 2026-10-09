@@ -10,7 +10,7 @@ from sklearn.metrics import make_scorer, accuracy_score, roc_auc_score
 
 import numpy as np
 
-
+# ищет корень проекта (папку с src/) вверх по дереву от start или от cwd
 def find_project_root(start: Path | None = None) -> Path:
     """Ищет корень проекта (папку с src/) вверх по дереву."""
     current = (start or Path.cwd()).resolve()
@@ -19,23 +19,23 @@ def find_project_root(start: Path | None = None) -> Path:
             return parent
     return current
 
-
+# находит корень проекта и добавляет его в sys.path, чтобы импортировался src/
 def ensure_root_on_path() -> Path:
     root = find_project_root()
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
     return root
 
-
+#  фиксирует random, numpy и (при наличии) torch/cuda сиды для воспроизводимости
 def set_seed(seed: int = 42) -> None:
     random.seed(seed)
     np.random.seed(seed)
 
-
+# RMSE (корень из MSE); для лог-таргета эквивалент RMSLE
 def rmse(y_true, y_pred) -> float:
     return float(np.sqrt(np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)))
 
-
+# rmsle(y_true, y_pred) - RMSLE: RMSE на log1p(y_true) и log1p(y_pred)
 def rmsle(y_true, y_pred) -> float:
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
@@ -53,5 +53,6 @@ def get_scorer(task: str):
     raise ValueError(f"Unknown task: {task}")
 
 
+# единый лог-принтер с префиксом [INFO] и flush=True
 def log(msg: str) -> None:
     print(f"[INFO] {msg}", flush=True)
