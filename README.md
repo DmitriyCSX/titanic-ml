@@ -68,7 +68,7 @@ make_submission
 | Logistic Regression   | 0.8217      | -                | -            |
 | Random Forest         | 0.8259      | -                | -            |
 | LightGBM              | 0.8146      | -                | -            |
-| CatBoost              | 0.8245      | -                | -            |
+| CatBoost              | 0.8235      | -                | -            |
 | **MLP [64, 32]** 👑   | **0.8238**  | **0.8212**       | **0.78468**  |
 
 **Финальная модель:** MLP [64, 32] (PyTorch, `BCEWithLogitsLoss`, early stopping).

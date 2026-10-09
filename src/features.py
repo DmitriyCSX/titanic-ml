@@ -42,7 +42,7 @@ def titanic_fare_per_person(df: pd.DataFrame) -> pd.Series:
 def titanic_has_cabin(df: pd.DataFrame) -> pd.Series:
     return df["Cabin"].notna().astype(int)
 
-# полный FE-пайплайн: Title, FamilySize, IsAlone, AgeGroup, FarePerPerson, HasCabin; редкие Title → "Rare"
+# полный FE-пайплайн: Title, FamilySize, IsAlone, AgeGroup, FarePerPerson, HasCabin; редкие Title  =>  "Rare"
 def build_titanic_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["Title"] = titanic_extract_title(df)
@@ -157,7 +157,7 @@ class TabularPreprocessor:
             df = df.drop(columns=existing)
         return df
 
-    # "нет фичи" → "None" для категориальных, 0 для числовых
+    # "нет фичи"  =>  "None" для категориальных, 0 для числовых
     def _fill_none(self, df: pd.DataFrame) -> pd.DataFrame:
         for col in self.cfg.get("none_categorical", []):
             if col in df.columns:
